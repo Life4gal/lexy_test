@@ -83,6 +83,43 @@ namespace grammar
 
 	static_assert(lexy::match<number>(lexy::zstring_input<lexy::utf8_encoding>(u8"-123456.789e-42 ")));
 
+	// -123456.789e-42
+	struct number_single_string : public lexy::token_production
+	{
+		struct value_part : public lexy::transparent_production
+		{
+			struct invalid_digit
+			{
+				consteval static auto name() { return "Invalid number digit."; }
+			};
+
+			struct trailing_space_required
+			{
+				consteval static auto name() { return "Trailing spaces or line breaks are required.(It may also be an invalid digit in the string.)"; }
+			};
+
+			constexpr static auto rule = []
+			{
+				constexpr auto value_part = dsl::sign + dsl::digits<>;
+				constexpr auto fraction_part = dsl::period >> dsl::digits<>.error<invalid_digit>;
+				constexpr auto exponent_part = (dsl::lit_c<'e'> | dsl::lit_c<'E'>) >> dsl::sign + dsl::digits<>.error<invalid_digit>;
+
+				constexpr auto trailing_space = dsl::peek(dsl::ascii::blank / dsl::ascii::newline).error<trailing_space_required>;
+
+				constexpr auto entire_number = dsl::token(value_part + dsl::if_(fraction_part) + dsl::if_(exponent_part));
+				return dsl::capture(entire_number) + trailing_space;
+			}();
+
+			constexpr static auto value = lexy::as_string<ast::number_single_string::value_type>;
+		};
+
+		constexpr static auto rule = dsl::p<value_part>;
+
+		constexpr static auto value = lexy::construct<ast::number_single_string>;
+	};
+
+	static_assert(lexy::match<number_single_string>(lexy::zstring_input<lexy::utf8_encoding>(u8"-123456.789e-42 ")));
+
 	struct orderless_birthday_info : public lexy::token_production
 	{
 		struct missing_field
@@ -172,7 +209,6 @@ namespace grammar
 			static_assert(std::tuple_size_v<ast::orderless_birthday_info::time_type> == 3);
 			constexpr static auto value =
 					lexy::bind(lexy::callback<ast::orderless_birthday_info::time_type>(
-										// []() noexcept -> ast::orderless_birthday_info::time_type { return ast::orderless_birthday_info::time_type{42, 42, 42}; },
 										[](
 										const ast::orderless_birthday_info::time_type::value_type i1,
 										const ast::orderless_birthday_info::time_type::value_type i2,
@@ -249,7 +285,7 @@ namespace lexy_test
 			throw std::exception{"Cannot read file!"};
 		}
 
-		auto production = lexy::parse<grammar::orderless_birthday_info>(file.buffer(), lexy_ext::report_error);
+		auto production = lexy::parse<grammar::number_single_string>(file.buffer(), lexy_ext::report_error);
 		if (!production.has_value())
 		{
 			// todo

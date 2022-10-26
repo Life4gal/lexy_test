@@ -24,6 +24,13 @@ namespace ast
 		std::optional<exponent_type> exponent;
 	};
 
+	struct number_single_string
+	{
+		using value_type = std::string;
+
+		value_type value;
+	};
+
 	struct orderless_birthday_info
 	{
 		using name_type = std::string;
