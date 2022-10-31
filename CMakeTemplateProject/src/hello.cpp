@@ -385,7 +385,7 @@ namespace grammar
 
 namespace lexy_test
 {
-	auto parse_and_print(const std::string_view filename) -> void
+	auto parse_file_and_print(const std::string_view filename) -> void
 	{
 		// constexpr auto is_little = std::endian::native == std::endian::little;
 
@@ -400,6 +400,21 @@ namespace lexy_test
 		}
 
 		auto production = lexy::parse<grammar::function_arguments>(file.buffer(), lexy_ext::report_error);
+		if (!production.has_value())
+		{
+			// todo
+			throw std::exception{"Context error!"};
+		}
+
+		const auto& value = std::move(production).value();
+		value.print();
+	}
+
+	auto parse_string_and_print(const std::u8string_view string) -> void
+	{
+		const auto buffer = lexy::string_input<lexy::utf8_encoding>(string);
+
+		auto production = lexy::parse<grammar::function_arguments>(buffer, lexy_ext::report_error);
 		if (!production.has_value())
 		{
 			// todo

@@ -122,5 +122,7 @@ namespace ast
 
 namespace lexy_test
 {
-	auto parse_and_print(std::string_view filename) -> void;
+	auto parse_file_and_print(std::string_view filename) -> void;
+
+	auto parse_string_and_print(std::u8string_view string) -> void;
 }

@@ -9,6 +9,6 @@ auto main() -> int
 			<< "\nCTP Version: " << CMakeTemplateProject_VERSION
 			<< '\n';
 
-	try { lexy_test::parse_and_print("test.txt"); }
+	try { lexy_test::parse_file_and_print("test.txt"); }
 	catch (const std::exception& e) { std::cout << "parse failed: " << e.what() << '\n'; }
 }
