@@ -267,6 +267,120 @@ namespace grammar
 			u8R"(month = 10 ,		time=23:59:59,
 					 year = 2022, name = "somebody", day = 24)"
 			)));
+
+	struct variable_with_type : public lexy::scan_production<ast::variable_with_type>, public lexy::token_production
+	{
+		// Allow spaces, tabs and newlines between the elements
+		constexpr static auto whitespace = dsl::ascii::blank | dsl::ascii::newline;
+
+		struct identifier_required
+		{
+			constexpr static auto name = "identifier required here";
+		};
+
+		struct name_required
+		{
+			constexpr static auto name = "variable name required here";
+		};
+
+		struct type_required
+		{
+			constexpr static auto name = "variable type required here";
+		};
+
+		struct unterminated
+		{
+			constexpr static auto name = "unterminated raw string literal";
+		};
+
+		struct identifier : public lexy::transparent_production
+		{
+			// struct invalid_character
+			// {
+			// 	static constexpr auto name = "invalid identifier character, space required";
+			// };
+
+			// Match an alpha character, followed by zero or more alphanumeric characters or underscores.
+			// Captures it all into a lexeme.
+			constexpr static auto rule = []
+			{
+				constexpr auto lead_char = dsl::ascii::alpha;
+				constexpr auto trailing_char = dsl::ascii::word;
+
+				return dsl::identifier(lead_char, trailing_char);// + dsl::peek(dsl::ascii::space).error<invalid_character>;
+			}();
+
+			// The final value of this production is a ast::variable_with_type::name_type we've created from the lexeme.
+			constexpr static auto value = lexy::as_string<ast::variable_with_type::name_type>;
+		};
+
+		template<typename Context, typename Reader>
+		constexpr static auto scan(lexy::rule_scanner<Context, Reader>& scanner) -> scan_result
+		{
+			// parse a identifier first
+			auto name_or_type = scanner.template parse<identifier>();
+			if (!name_or_type.has_value())
+			{
+				scanner.fatal_error(identifier_required{}, scanner.begin(), scanner.position());
+				return lexy::scan_failed;
+			}
+
+			// has colon
+			if (scanner.branch(dsl::colon))
+			{
+				// variable_name: type
+				auto type = scanner.template parse<identifier>();
+				if (!type.has_value())
+				{
+					// Report an error for a type required.
+					scanner.fatal_error(type_required{}, scanner.begin(), scanner.position());
+					return lexy::scan_failed;
+				}
+
+				return ast::variable_with_type{.name = std::move(name_or_type).value(), .type = std::move(type).value()};
+			}
+
+			// optional type?
+			if (scanner.is_at_eof())
+			{
+				// Report an error for an unterminated literal.
+				scanner.fatal_error(unterminated{}, scanner.begin(), scanner.position());
+				return lexy::scan_failed;
+			}
+
+			// type variable_name
+			auto name = scanner.template parse<identifier>();
+			if (!name.has_value())
+			{
+				// Report an error for a name required.
+				scanner.fatal_error(name_required{}, scanner.begin(), scanner.position());
+				return lexy::scan_failed;
+			}
+
+			return ast::variable_with_type{.name = std::move(name).value(), .type = std::move(name_or_type).value()};
+		}
+	};
+
+	struct function_arguments : public lexy::token_production
+	{
+		struct value_part : public lexy::transparent_production
+		{
+			constexpr static auto max_recursion_depth = 32;
+
+			// Whitespace is a sequence of space, tab, carriage return, or newline.
+			constexpr static auto whitespace = dsl::ascii::space;
+
+			constexpr static auto rule = dsl::round_bracketed.opt_list(
+					dsl::recurse<variable_with_type>,
+					dsl::sep(dsl::comma));
+
+			constexpr static auto value = lexy::as_list<ast::function_arguments::arguments_type>;
+		};
+
+		constexpr static auto rule = dsl::p<value_part>;
+
+		constexpr static auto value = lexy::construct<ast::function_arguments>;
+	};
 }
 
 namespace lexy_test
@@ -285,13 +399,14 @@ namespace lexy_test
 			throw std::exception{"Cannot read file!"};
 		}
 
-		auto production = lexy::parse<grammar::number_single_string>(file.buffer(), lexy_ext::report_error);
+		auto production = lexy::parse<grammar::function_arguments>(file.buffer(), lexy_ext::report_error);
 		if (!production.has_value())
 		{
 			// todo
 			throw std::exception{"Context error!"};
 		}
 
-		[[maybe_unused]] const auto& value = std::move(production).value();
+		const auto& value = std::move(production).value();
+		value.print();
 	}
 }// namespace ctp

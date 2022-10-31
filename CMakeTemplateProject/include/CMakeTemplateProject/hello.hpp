@@ -5,6 +5,7 @@
 #include <optional>
 #include <vector>
 #include <array>
+#include <fmt/format.h>
 
 namespace ast
 {
@@ -22,6 +23,16 @@ namespace ast
 		value_type value;
 		std::optional<fraction_type> fraction;
 		std::optional<exponent_type> exponent;
+
+		auto print() const -> void
+		{
+			fmt::print("number: {}{}{}{}{}",
+						value,
+						fraction.has_value() ? "." : "",
+						fraction.has_value() ? *fraction : "",
+						exponent.has_value() ? "e" : "",
+						exponent.has_value() ? fmt::to_string(*exponent) : "");
+		}
 	};
 
 	struct number_single_string
@@ -29,6 +40,8 @@ namespace ast
 		using value_type = std::string;
 
 		value_type value;
+
+		auto print() const -> void { fmt::print("number_single_string: {}", value); }
 	};
 
 	struct orderless_birthday_info
@@ -51,12 +64,59 @@ namespace ast
 		// --> month = 10
 		// --> day = 24
 		// --> time = [23, 59, 59]
-		
-		name_type  name;
+
+		name_type name;
 		year_type year;
 		month_type month;
-		day_type   day;
-		time_type  time;
+		day_type day;
+		time_type time;
+
+		auto print() const -> void
+		{
+			fmt::print("orderless_birthday_info: {}-{}:{}:{} {}:{}:{}",
+						name,
+						year,
+						month,
+						day,
+						time[0],
+						time[1],
+						time[2]
+					);
+		}
+	};
+
+	// int a
+	// a: int
+	struct variable_with_type
+	{
+		using name_type = std::string;
+
+		name_type name;
+		name_type type;
+
+		auto print() const -> void
+		{
+			fmt::print("variable_with_type: {}: {}",
+						name,
+						type);
+		}
+	};
+
+	struct function_arguments
+	{
+		using arguments_type = std::vector<variable_with_type>;
+
+		arguments_type arguments;
+
+		auto print() const -> void
+		{
+			fmt::print("function_arguments: \n");
+			for (const auto& argument: arguments)
+			{
+				fmt::print("\t");
+				argument.print();
+			}
+		}
 	};
 }
 
